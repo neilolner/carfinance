@@ -13,6 +13,13 @@ class Order extends Model
 
     protected $fillable = ['customer_id', 'status', 'total'];
 
+    protected $perPage = 50;
+
+    protected function casts(): array
+    {
+        return ['total' => 'decimal:2'];
+    }
+
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);

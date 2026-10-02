@@ -2,38 +2,34 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Resources\OrderResource;
 use App\Models\Order;
-use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class OrderController extends Controller
 {
-    public function index(): JsonResponse
+    private const MAX_PER_PAGE = 100;
+
+    public function index(Request $request): AnonymousResourceCollection
     {
-        // TODO: This endpoint becomes slow with many orders. Investigate query count.
-        $orders = Order::all();
+        $validated = $request->validate([
+            'per_page' => ['sometimes', 'integer', 'min:1', 'max:' . self::MAX_PER_PAGE],
+        ]);
 
-        $result = [];
+        // Eager load relations (3 queries total) instead of lazy loading per order (1 + 2N).
+        // Foreign keys must stay in the column lists or the eager-load mapping breaks.
+        // Cursor pagination keys on id: no OFFSET scan and no COUNT(*), so deep pages stay fast.
+        $orders = Order::query()
+            ->select(['id', 'customer_id', 'status', 'total'])
+            ->with([
+                'customer:id,name,email',
+                'items:id,order_id,product_name,sku,quantity,unit_price',
+            ])
+            ->orderBy('id')
+            ->cursorPaginate($validated['per_page'] ?? null)
+            ->withQueryString();
 
-        foreach ($orders as $order) {
-            $result[] = [
-                'id'       => $order->id,
-                'status'   => $order->status,
-                'total'    => $order->total,
-                'customer' => [
-                    'id'    => $order->customer->id,
-                    'name'  => $order->customer->name,
-                    'email' => $order->customer->email,
-                ],
-                'items' => $order->items->map(fn ($item) => [
-                    'id'           => $item->id,
-                    'product_name' => $item->product_name,
-                    'sku'          => $item->sku,
-                    'quantity'     => $item->quantity,
-                    'unit_price'   => $item->unit_price,
-                ]),
-            ];
-        }
-
-        return response()->json($result);
+        return OrderResource::collection($orders);
     }
 }
