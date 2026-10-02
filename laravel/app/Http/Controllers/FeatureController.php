@@ -26,12 +26,8 @@ class FeatureController extends Controller
         $feature = Feature::findOrFail($featureId);
         $user = User::findOrFail($userId);
 
-        // TODO: How should feature access be centralized?
-        // Duplicate check: this logic also appears in FeatureEnabled middleware
-        if (! $feature->enabled) {
-            return response()->json(['message' => 'Feature is globally disabled.'], 403);
-        }
-
+        // Assignment is allowed while globally disabled so testers can be
+        // lined up before release; access is enforced by isAccessibleBy().
         $feature->users()->syncWithoutDetaching([$user->id]);
 
         return response()->json(['message' => 'Feature assigned.']);

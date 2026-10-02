@@ -35,4 +35,9 @@ class User extends Authenticatable
     {
         return $this->belongsToMany(Feature::class);
     }
+
+    public function hasFeature(string $key): bool
+    {
+        return Feature::where('key', $key)->first()?->isAccessibleBy($this) ?? false;
+    }
 }
